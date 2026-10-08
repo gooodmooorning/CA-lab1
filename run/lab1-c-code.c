@@ -4,8 +4,8 @@
 #endif
 
 //--------------------- !!! TODO: FILL IN YOUR FILE PATH !!! ------------------------------------------
-char read_path[] = "/home/student/yao-archlab-f26/lab1/sample/data.in";
-char write_path[] = "/home/student/yao-archlab-f26/lab1/sample/data.out";
+char read_path[] = "/home/student/labs/CA-lab1/sample/data.in";
+char write_path[] = "/home/student/labs/CA-lab1/sample/data.out";
 //-----------------------------------------------------------------------------------------------------
 
 
@@ -87,6 +87,14 @@ void dft_transform_impl(){
 				X[j].y=y2;
                 twiddle_k+=expTable_step;
             }
+        }
+    }
+    for (int i = 0; i < N; i ++){
+        if (X[i].x < 0){
+            X[i].x+=2147483648;
+        }
+        if (X[i].y < 0){
+            X[i].y+=2147483648;
         }
     }
     //-------------------------------------------------------------------------------------------------------
