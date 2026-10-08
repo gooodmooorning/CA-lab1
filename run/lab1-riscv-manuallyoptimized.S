@@ -1,9 +1,9 @@
 .data
 # -------------------------------------- TODO: FILL IN YOUR FILE PATH !!! -------------------------------------------
 read_path:
-		.string "/home/student/yao-archlab-f26/lab1/sample/data.in"
+		.string "/home/student/labs/CA-lab1/sample/data.in"
 write_path:
-		.string "/home/student/yao-archlab-f26/lab1/sample/data.out"
+		.string "/home/student/labs/CA-lab1/sample/data.out"
 # ------------------------------------------------------------------------------------------------------------------
 X:
         .zero   1024
@@ -318,115 +318,56 @@ i_loop:
     bge     s8, s0, i_end
     li      s10, 0              # twiddle_k = 0
     mv      s9, s8              # j = i
-    add     s11, s8, s6         # 结束条件 = i + halfsize
+    add     s11, s8, s6         
 j_loop:
     bge     s9, s11, j_end
 
-    # calc &X[j] and &X[j+halfsize]
     slli    t0, s9, 3           # j * 8
     add     t1, s1, t0          # t1 = &X[j]
     slli    t2, s6, 3           # halfsize * 8
     add     t3, t1, t2          # t3 = &X[j+halfsize]
-    sw      t1, 0(sp)           # 保存 &X[j]
-    sw      t3, 4(sp)           # 保存 &X[j+halfsize]
 
     # load X[j] and X[j+halfsize]
     lw      t4, 0(t1)           # X[j].x
-    sw      t4, 8(sp)
-    lw      t4, 4(t1)           # X[j].y
-    sw      t4, 12(sp)
-    lw      t4, 0(t3)           # X[j+halfsize].x
-    sw      t4, 16(sp)
-    lw      t4, 4(t3)           # X[j+halfsize].y
-    sw      t4, 20(sp)
+    lw      t5, 4(t1)           # X[j].y
+    lw      t6, 0(t3)           # X[j+halfsize].x
+    lw      a0, 4(t3)           # X[j+halfsize].y
 
     # load expTable
-    slli    t4, s10, 3          # twiddle_k * 8
-    add     t4, s3, t4          # &expTable[twiddle_k]
-    lw      t5, 0(t4)           # expTable.x
-    sw      t5, 24(sp)
-    lw      t5, 4(t4)           # expTable.y
-    sw      t5, 28(sp)
+    slli    a1, s10, 3
+    add     a1, s3, a1
+    lw      a2, 0(a1)           # expTable.x
+    lw      a3, 4(a1)           # expTable.y
 
-    # implement mymul here
-    # m1 = (X[j+halfsize].x * expTable.x) >> 13
-    lw      t0, 16(sp)
-    lw      t1, 24(sp)
-    mul     t2, t0, t1
-    srai    t2, t2, 13
-    sw      t2, 32(sp)          # m1
+    # mymul implemented here
+    mul     a4, t6, a2
+    srai    a4, a4, 13          # m1 = (X[j+halfsize].x * wx) >> 13
+    mul     a5, a0, a3
+    srai    a5, a5, 13          # m2 = (X[j+halfsize].y * wy) >> 13
+    mul     a6, t6, a3
+    srai    a6, a6, 13          # m3 = (X[j+halfsize].x * wy) >> 13
+    mul     a7, a0, a2
+    srai    a7, a7, 13          # m4 = (X[j+halfsize].y * wx) >> 13
 
-    # m2 = (X[j+halfsize].y * expTable.y) >> 13
-    lw      t0, 20(sp)
-    lw      t1, 28(sp)
-    mul     t2, t0, t1
-    srai    t2, t2, 13
-    sw      t2, 36(sp)          # m2
+    # diff = m1 - m2，sum = m3 + m4
+    sub     a4, a4, a5          # a4 = diff
+    add     a6, a6, a7          # a6 = sum
 
-    # m3 = (X[j+halfsize].x * expTable.y) >> 13
-    lw      t0, 16(sp)
-    lw      t1, 28(sp)
-    mul     t2, t0, t1
-    srai    t2, t2, 13
-    sw      t2, 40(sp)          # m3
+    # x1 = X[j].x - diff，y1 = X[j].y - sum
+    sub     a5, t4, a4          # a5 = x1
+    sub     a7, t5, a6          # a7 = y1
 
-    # m4 = (X[j+halfsize].y * expTable.x) >> 13
-    lw      t0, 20(sp)
-    lw      t1, 24(sp)
-    mul     t2, t0, t1
-    srai    t2, t2, 13
-    sw      t2, 44(sp)          # m4
+    # x2 = X[j].x + diff，y2 = X[j].y + sum
+    add     a4, t4, a4          # a4 = x2
+    add     a6, t5, a6          # a6 = y2
 
-    # diff = m1 - m2
-    lw      t0, 32(sp)
-    lw      t1, 36(sp)
-    sub     t2, t0, t1
-    sw      t2, 64(sp)          # diff
+    # writeback
+    sw      a4, 0(t1)           # X[j].x        = x2
+    sw      a6, 4(t1)           # X[j].y        = y2
+    sw      a5, 0(t3)           # X[j+halfsize].x = x1
+    sw      a7, 4(t3)           # X[j+halfsize].y = y1
 
-    # sum = m3 + m4
-    lw      t0, 40(sp)
-    lw      t1, 44(sp)
-    add     t2, t0, t1
-    sw      t2, 68(sp)          # sum
-
-    # x1 = X[j].x - diff
-    lw      t3, 8(sp)
-    lw      t2, 64(sp)
-    sub     t4, t3, t2
-    sw      t4, 48(sp)          # x1
-
-    # y1 = X[j].y - sum
-    lw      t3, 12(sp)
-    lw      t2, 68(sp)
-    sub     t4, t3, t2
-    sw      t4, 52(sp)          # y1
-
-    # x2 = X[j].x + diff
-    lw      t3, 8(sp)
-    lw      t2, 64(sp)
-    add     t4, t3, t2
-    sw      t4, 56(sp)          # x2
-
-    # y2 = X[j].y + sum
-    lw      t3, 12(sp)
-    lw      t2, 68(sp)
-    add     t4, t3, t2
-    sw      t4, 60(sp)          # y2
-
-    # write back
-    lw      t1, 0(sp)           # &X[j]
-    lw      t3, 4(sp)           # &X[j+halfsize]
-    lw      t4, 56(sp)          # x2
-    sw      t4, 0(t1)           # X[j].x = x2
-    lw      t4, 60(sp)          # y2
-    sw      t4, 4(t1)           # X[j].y = y2
-    lw      t4, 48(sp)          # x1
-    sw      t4, 0(t3)           # X[j+halfsize].x = x1
-    lw      t4, 52(sp)          # y1
-    sw      t4, 4(t3)           # X[j+halfsize].y = y1
-
-    # twiddle_k += expTable_step
-    add     s10, s10, s7
+    add     s10, s10, s7        # twiddle_k += expTable_step
     addi    s9, s9, 1           # j++
     j       j_loop
 j_end:
